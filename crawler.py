@@ -1,5 +1,5 @@
 # coding: utf-8
-from typing import Dict, List
+from typing import Dict, List, Union
 from json import dumps
 import datetime
 import re
@@ -24,7 +24,15 @@ XPATHS = {
     "review_comment": './/span/div/div[5]/div[1]/div/span',
     "review_date_no_image": './/span/div/div[8]/div[1]',  # Alguns reviews possuem imagem. Isso altera o índice da <div> que contém a data
     "review_date_image": './/span/div/div[7]/div[1]',
-    "review_rating": ".//span/div/div[2]/*[name()='svg']"
+    "review_rating": ".//span/div/div[2]/*[name()='svg']",
+    "local": ".//span/div/div[1]/div[1]/div[2]/div/div",
+    "category": ".//span/div/div[4]"
+}
+
+REGEXES = {
+    "starts_with_number": '^\d.+$',
+    "rating": "^(\d.\d) of \d bubbles$",
+    "get_local": "^([a-zA-Z, ]+)\d.+$"
 }
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
@@ -38,7 +46,7 @@ WebDriverWait(driver, 10).until(
 
 
 WebDriverWait(driver, 3).until(expected_conditions.element_to_be_clickable((By.XPATH, XPATHS["language_selector"])))
-WebDriverWait(driver, 3).until(expected_conditions.element_to_be_clickable((By.XPATH, XPATHS["language_selector"])))
+
 language_selector = driver.find_element(By.XPATH, XPATHS["language_selector"])
 cannot_click = True
 while cannot_click:
@@ -52,9 +60,11 @@ while cannot_click:
 portuguese_option = driver.find_element(By.XPATH, XPATHS["portuguese_option"])
 portuguese_option.click()
 
+
 def parse_date(date: str):
     parsed = datetime.datetime.strptime(date, "Written %B %d, %Y").strftime("%d/%m/%Y")
     return parsed
+
 
 def get_review_date(review: WebElement):
     try:
@@ -65,8 +75,27 @@ def get_review_date(review: WebElement):
 
 
 def parse_rating(rating: str):
-    pattern = re.compile("^(\d.\d) of \d bubbles$")
+    pattern = re.compile(REGEXES["rating"])
     return float(re.match(pattern, rating).group(1))
+
+
+def get_local(review: WebElement) -> Union[str, None]:
+    local_and_contributions = review.find_element(By.XPATH, XPATHS["local"]).text
+
+    # Se não começa com número, significa que, antes, vem a cidade de onde a pessoa escreve
+    match = re.match(REGEXES["get_local"], local_and_contributions)
+    if match:
+        return match.group(1)
+
+    return None
+
+
+def get_category(review: WebElement) -> Union[str, None]:
+    try:
+        return review.find_element(By.XPATH, XPATHS["category"]).text
+    except NoSuchElementException as e:
+        return None
+
 
 
 def handle_review(review: WebElement) -> Dict:
@@ -74,12 +103,16 @@ def handle_review(review: WebElement) -> Dict:
     comment = review.find_element(By.XPATH, XPATHS["review_comment"]).text
     date = get_review_date(review)
     rating = review.find_element(By.XPATH, XPATHS["review_rating"]).get_attribute("aria-label")
+    local = get_local(review)
+    category = get_category(review)
 
     return {
         "title": title,
         "comment": comment,
         "date": parse_date(date),
-        "rating": parse_rating(rating)
+        "rating": parse_rating(rating),
+        "local": local,
+        "category": category
     }
 
 def scrap_page(driver: WebDriver) -> List[Dict]:
@@ -95,7 +128,7 @@ def scrap_page(driver: WebDriver) -> List[Dict]:
 try:
     reviews = []
     has_next_page = True
-    limit = 1
+    limit = 3
     while has_next_page and limit > 0:
         WebDriverWait(driver, 5).until(expected_conditions.presence_of_element_located((By.XPATH, XPATHS["next_page_button"])))
         reviews.append(scrap_page(driver))
