@@ -3,6 +3,7 @@ import csv
 import datetime
 import os
 from concurrent import futures
+import traceback
 from typing import Dict, List, TextIO
 
 from beeper import beep
@@ -23,7 +24,7 @@ def write_data_chunk(csv_writer: csv.DictWriter, data: List[Dict], amount: int):
 
 def scrap_url(crawler: Crawler, csv_writer: csv.DictWriter, file: TextIO, page_title: str):
     language = 'pt'
-    review_amount = int(crawler.language_routine(language))
+    review_amount = int(crawler.language_routine(language).replace(',', ''))
     custom_print("{} -> {} reviews encontrados".format(page_title, review_amount))
     reviews = []
     counter = 0
@@ -103,14 +104,15 @@ def main():
     directory = "reviews/{}".format(begin_time)
     os.mkdir("reviews/{}".format(begin_time))
     tasks = set()
-    with futures.ThreadPoolExecutor(2) as executor:
+    with futures.ThreadPoolExecutor(1) as executor:
         future_results = {url: executor.submit(url_task, url, begin_time) for url in urls}
         for url, future in future_results.items():
             try:
                 future.result()
             except Exception as exc:
-                custom_print("Thread de {} gerou uma exceção: {}".format(url, exc))
+                custom_print("Thread de {} gerou uma exceção:" .format(url), "error")
+                traceback.print_exception(type(exc), exc, exc.__traceback__)
 
-directory = ""
+
 if __name__ == "__main__":
     main()

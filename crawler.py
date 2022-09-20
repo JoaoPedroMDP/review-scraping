@@ -25,18 +25,23 @@ CSS_CLASSES = {
         "local": {
             "div": "JINyA"
         }
+    },
+    "obstacles": {
+        "bottom_ads": "ZHIlj E s f e"
     }
 }
 
 
 XPATHS = {
+    "bottom_ads_closer": ".//button[contains(@type, 'button') and contains (@aria-label, 'Close')]",
+    "bottom_ads": ".//div[contains(@class, '{}')]".format(CSS_CLASSES["obstacles"]["bottom_ads"]),
     "accept_cookies": '//*[@id="onetrust-accept-btn-handler"]',
     "language_selector": '//*[@id="tab-data-qa-reviews-0"]/div/div[1]/span/div/div[2]/div/div/span[2]/span/div/div/button',
     "lang_option": './/span[@id="menu-item-{}"]',
     "next_page_button": '//a[contains(@data-smoke-attr, "pagination-next-arrow")]',
     "pagination_info": '//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div[11]/div[2]/div/div',
     "place_name": './/h1[@data-automation="mainH1"]',
-    "review_amount": './span',
+    "review_amount": '//*[@id="tab-data-qa-reviews-0"]/div/div[3]/span/div/div[1]/div[2]/span',
     "review_cards": '//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div',
     "review_title": './/span/div/div[contains(@class, "'+CSS_CLASSES["review"]["title"]+'")]/a/span',
     "review_comment": './/div[contains(@class, "'+CSS_CLASSES["review"]["comment"]["div"]+'")]/span[contains(@class, "'+CSS_CLASSES["review"]["comment"]["span"]+'")]',
@@ -50,7 +55,7 @@ REGEXES = {
     "starts_with_number": '^\d.+$',
     "rating": "^(\d.\d) of \d bubbles$",
     "get_local": "^([a-zA-Z, ]+)\d.+$",
-    "get_review_amount": "^\((\d+)\)$"
+    "get_review_amount": "^(((\d)+,?)*) reviews$"
 }
 
 class Crawler:
@@ -64,6 +69,22 @@ class Crawler:
         self.driver.get(url)
         if cookies:
             self.__handle_cookies()
+        
+        self.__handle_obstacles()
+
+    def __handle_obstacles(self):
+        bottom_ads = self.__have_ads_at_bottom()
+        if bottom_ads is not None:
+            self.__handle_ads(bottom_ads)
+
+    def __have_ads_at_bottom(self) -> Union[WebElement, None]:
+        try:
+            return self.driver.find_element(By.XPATH, XPATHS["bottom_ads"])
+        except NoSuchElementException:
+            return None
+
+    def __handle_ads(self, bottom_ads: WebElement):
+        bottom_ads.find_element(By.XPATH, XPATHS["bottom_ads_closer"]).click()
 
     def close(self):
         self.driver.close()
@@ -105,13 +126,15 @@ class Crawler:
                 (By.XPATH, XPATHS["language_selector"])
             )
         )
+
         language_selector = self.driver.find_element(By.XPATH, XPATHS["language_selector"])
         cannot_click = True
         while cannot_click:
             try:
                 language_selector.click()
                 cannot_click = False
-            except ElementClickInterceptedException:
+            except ElementClickInterceptedException as e:
+                custom_print(str(e))
                 custom_print("Erro ao clicar no seletor de idioma. Tentando novamente...")
                 cannot_click = True
 
@@ -214,6 +237,7 @@ class Crawler:
 
         review_amount = 0
         try:
+            print("Review amount: " + review_amount_str)
             review_amount = re.match(REGEXES["get_review_amount"], review_amount_str).group(1)
         except Exception as e:
             raise Exception("Não foi possível encontrar a quantidade de reviews da língua {}: {}".format(lang, e))
