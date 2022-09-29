@@ -13,19 +13,24 @@ from timer import Timer
 
 timer = Timer()
 
+
 def write_data_chunk(csv_writer: csv.DictWriter, data: List[Dict], amount: int):
     try:
-        custom_print("Salvando {} reviews em {}".format(amount, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+        custom_print("Salvando {} reviews em {}".format(
+            amount, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
         csv_writer.writerows(data)
-        custom_print("Salvamento terminado em {}".format(datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+        custom_print("Salvamento terminado em {}".format(
+            datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
     except Exception as e:
         custom_print("Erro ao salvar os reviews: {}".format(e), "error")
         beep("exception")
 
+
 def scrap_url(crawler: Crawler, csv_writer: csv.DictWriter, file: TextIO, page_title: str):
     language = 'pt'
     review_amount = int(crawler.language_routine(language).replace(',', ''))
-    custom_print("{} -> {} reviews encontrados".format(page_title, review_amount))
+    custom_print(
+        "{} -> {} reviews encontrados".format(page_title, review_amount))
     reviews = []
     counter = 0
     has_next_page = True
@@ -37,7 +42,8 @@ def scrap_url(crawler: Crawler, csv_writer: csv.DictWriter, file: TextIO, page_t
             reviews, processed = crawler.scrap_page()
             counter += processed
 
-            custom_print("{} -> {:.2f}% ({}/{})".format(page_title, (counter/review_amount)*100, counter, review_amount))
+            custom_print("{} -> {:.2f}% ({}/{})".format(page_title,
+                         (counter/review_amount)*100, counter, review_amount))
             has_next_page = crawler.has_next_page()
 
             if counter % saving_threshold == 0:
@@ -50,22 +56,24 @@ def scrap_url(crawler: Crawler, csv_writer: csv.DictWriter, file: TextIO, page_t
         custom_print("{} gerou uma exceção => {}".format(page_title, exc))
         beep("exception")
 
-    custom_print("{} -> Salvando os restantes {} reviews".format(page_title, len(reviews)))
+    custom_print(
+        "{} -> Salvando os restantes {} reviews".format(page_title, len(reviews)))
     if reviews:
         write_data_chunk(csv_writer, reviews, len(reviews))
 
 
 def start_csv_writer(file: TextIO) -> csv.DictWriter:
     example = {
-            "title": "",
-            "comment": "",
-            "date": "",
-            "rating": "",
-            "local": "",
-            "category": ""
-        }
+        "title": "",
+        "comment": "",
+        "date": "",
+        "rating": "",
+        "local": "",
+        "category": ""
+    }
     dict_to_csv_writer = csv.DictWriter(file, example.keys())
     return dict_to_csv_writer
+
 
 def url_task(url: str, directory: str):
     custom_print("Iniciando {}".format(url))
@@ -92,7 +100,9 @@ def url_task(url: str, directory: str):
     custom_print("{} -> Fechando o arquivo".format(page_title))
     file.close()
     beep("done")
-    custom_print("DONE -----> {} terminada em {} segundos".format(page_title, url_timer.stop()))
+    custom_print(
+        "DONE -----> {} terminada em {} segundos".format(page_title, url_timer.stop()))
+
 
 def main():
     urls = []
@@ -104,13 +114,15 @@ def main():
     directory = "reviews/{}".format(begin_time)
     os.mkdir("reviews/{}".format(begin_time))
     tasks = set()
-    with futures.ThreadPoolExecutor(1) as executor:
-        future_results = {url: executor.submit(url_task, url, begin_time) for url in urls}
+    with futures.ThreadPoolExecutor(5) as executor:
+        future_results = {url: executor.submit(
+            url_task, url, begin_time) for url in urls}
         for url, future in future_results.items():
             try:
                 future.result()
             except Exception as exc:
-                custom_print("Thread de {} gerou uma exceção:" .format(url), "error")
+                custom_print(
+                    "Thread de {} gerou uma exceção:" .format(url), "error")
                 traceback.print_exception(type(exc), exc, exc.__traceback__)
 
 

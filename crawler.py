@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 CSS_CLASSES = {
-    "review":{
+    "review": {
         "title": "biGQs _P fiohW qWPrE ncFvv fOtGX",
         "date": "TreSq",
         "category": "RpeCd",
@@ -58,18 +58,21 @@ REGEXES = {
     "get_review_amount": "^(((\d)+,?)*) reviews$"
 }
 
+
 class Crawler:
     def __init__(self):
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless")
         # self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), chrome_options=chrome_options)
+        self.driver = webdriver.Chrome(service=Service(
+            ChromeDriverManager().install()), chrome_options=chrome_options)
 
     def open_page(self, url: str, cookies: bool = True):
+        custom_print("Puxando url {}".format(url))
         self.driver.get(url)
         if cookies:
             self.__handle_cookies()
-        
+
         self.__handle_obstacles()
 
     def __handle_obstacles(self):
@@ -92,7 +95,8 @@ class Crawler:
     def select_language(self, lang: str):
         self.__open_language_selector()
         try:
-            lang_option = self.driver.find_element(By.XPATH, XPATHS["lang_option"].format(lang))
+            lang_option = self.driver.find_element(
+                By.XPATH, XPATHS["lang_option"].format(lang))
             lang_option.click()
         except NoSuchElementException as e:
             custom_print("Não foi possível encontrar a língua {}".format(lang))
@@ -109,13 +113,15 @@ class Crawler:
             custom_print("Acabaram-se as páginas!")
             return False
         except Exception as e:
-            custom_print("Erro ao verificar se há próxima página: {}".format(e))
+            custom_print(
+                "Erro ao verificar se há próxima página: {}".format(e))
             return False
 
     def __handle_cookies(self):
         try:
             WebDriverWait(self.driver, 10).until(
-                expected_conditions.element_to_be_clickable((By.XPATH, XPATHS["accept_cookies"]))
+                expected_conditions.element_to_be_clickable(
+                    (By.XPATH, XPATHS["accept_cookies"]))
             ).click()
         except TimeoutException:
             custom_print("Supondo que não haverão mais cookies, prosseguindo.")
@@ -127,7 +133,8 @@ class Crawler:
             )
         )
 
-        language_selector = self.driver.find_element(By.XPATH, XPATHS["language_selector"])
+        language_selector = self.driver.find_element(
+            By.XPATH, XPATHS["language_selector"])
         cannot_click = True
         while cannot_click:
             try:
@@ -135,25 +142,33 @@ class Crawler:
                 cannot_click = False
             except ElementClickInterceptedException as e:
                 custom_print(str(e))
-                custom_print("Erro ao clicar no seletor de idioma. Tentando novamente...")
+                custom_print(
+                    "Erro ao clicar no seletor de idioma. Tentando novamente...")
                 cannot_click = True
 
     def go_to_next_page(self):
         try:
-            self.driver.find_element(By.XPATH, XPATHS["next_page_button"]).click()
+            custom_print("Indo para próxima página")
+            self.driver.find_element(
+                By.XPATH, XPATHS["next_page_button"]).click()
         except NoSuchElementException:
-            raise Exception("Não foi possível encontrar o botão de próxima página.")
+            raise Exception(
+                "Não foi possível encontrar o botão de próxima página.")
 
     def wait_reviews_to_load(self):
         try:
-            WebDriverWait(self.driver, 10).until(expected_conditions.presence_of_element_located((By.XPATH, XPATHS["pagination_info"])))
+            WebDriverWait(self.driver, 10).until(
+                expected_conditions.presence_of_element_located((By.XPATH, XPATHS["pagination_info"])))
         except TimeoutException:
-            custom_print("Tempo esgotado ao aguardar o carregamento das reviews")
+            custom_print(
+                "Tempo esgotado ao aguardar o carregamento das reviews")
         except Exception as e:
-            raise Exception("Erro ao aguardar o carregamento das reviews: {}".format(e))
+            raise Exception(
+                "Erro ao aguardar o carregamento das reviews: {}".format(e))
 
     def scrap_page(self) -> Tuple[List[Dict], int]:
-        raw_reviews = self.driver.find_elements(By.XPATH, XPATHS["review_cards"])
+        raw_reviews = self.driver.find_elements(
+            By.XPATH, XPATHS["review_cards"])
         page_reviews = []
 
         raw_reviews.pop()  # O último elemento é um botão nada a ver
@@ -164,9 +179,9 @@ class Crawler:
 
         return page_reviews, counter
 
-
     def parse_date(self, date: str):
-        parsed = datetime.datetime.strptime(date, "Written %B %d, %Y").strftime("%d/%m/%Y")
+        parsed = datetime.datetime.strptime(
+            date, "Written %B %d, %Y").strftime("%d/%m/%Y")
         return parsed
 
     def get_review_date(self, review: WebElement):
@@ -178,20 +193,21 @@ class Crawler:
         try:
             rating = float(re.match(pattern, rating_str).group(1))
         except Exception as e:
-            custom_print("Erro ao parsear o rating ({}): {}".format(rating_str, e))
+            custom_print(
+                "Erro ao parsear o rating ({}): {}".format(rating_str, e))
 
         return rating
 
-
     def get_local(self, review: WebElement) -> Union[str, None]:
-        local_and_contributions = review.find_element(By.XPATH, XPATHS["local"]).text
+        local_and_contributions = review.find_element(
+            By.XPATH, XPATHS["local"]).text
 
         # Se não começa com número, significa que, antes, vem a cidade de onde a pessoa escreve
         match = re.match(REGEXES["get_local"], local_and_contributions)
         local = ""
         if match:
             try:
-                local =  match.group(1)
+                local = match.group(1)
             except Exception as e:
                 custom_print("Erro ao obter o local: {}".format(e))
 
@@ -207,7 +223,8 @@ class Crawler:
         title = review.find_element(By.XPATH, XPATHS["review_title"]).text
         comment = review.find_element(By.XPATH, XPATHS["review_comment"]).text
         date = self.get_review_date(review)
-        rating = review.find_element(By.XPATH, XPATHS["review_rating"]).get_attribute("aria-label")
+        rating = review.find_element(
+            By.XPATH, XPATHS["review_rating"]).get_attribute("aria-label")
         local = self.get_local(review)
         category = self.get_category(review)
 
@@ -222,24 +239,31 @@ class Crawler:
 
     def get_review_amount(self, language: str):
         self.__open_language_selector()
-        lang_option = self.driver.find_element(By.XPATH, XPATHS["lang_option"].format(language))
-        lang_string = lang_option.find_element(By.XPATH, XPATHS["review_amount"]).text
+        lang_option = self.driver.find_element(
+            By.XPATH, XPATHS["lang_option"].format(language))
+        lang_string = lang_option.find_element(
+            By.XPATH, XPATHS["review_amount"]).text
         return "".join(lang_string.split()[1:-2])
 
     def language_routine(self, lang: str):
         self.__open_language_selector()
         try:
-            lang_option = self.driver.find_element(By.XPATH, XPATHS["lang_option"].format(lang))
-            review_amount_str = lang_option.find_element(By.XPATH, XPATHS["review_amount"]).text
+            lang_option = self.driver.find_element(
+                By.XPATH, XPATHS["lang_option"].format(lang))
+            review_amount_str = lang_option.find_element(
+                By.XPATH, XPATHS["review_amount"]).text
             lang_option.click()
         except NoSuchElementException as e:
-            raise Exception("Não foi possível encontrar a língua {}".format(lang))
+            raise Exception(
+                "Não foi possível encontrar a língua {}".format(lang))
 
         review_amount = 0
         try:
             print("Review amount: " + review_amount_str)
-            review_amount = re.match(REGEXES["get_review_amount"], review_amount_str).group(1)
+            review_amount = re.match(
+                REGEXES["get_review_amount"], review_amount_str).group(1)
         except Exception as e:
-            raise Exception("Não foi possível encontrar a quantidade de reviews da língua {}: {}".format(lang, e))
+            raise Exception(
+                "Não foi possível encontrar a quantidade de reviews da língua {}: {}".format(lang, e))
 
         return review_amount
