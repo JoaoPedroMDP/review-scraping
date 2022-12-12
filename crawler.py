@@ -2,7 +2,8 @@
 import datetime
 import re
 from typing import Dict, List, Union, Tuple
-from logger import custom_print
+from logging import getLogger, debug
+import locale
 
 from selenium import webdriver
 from selenium.common import NoSuchElementException, ElementClickInterceptedException, TimeoutException
@@ -13,10 +14,12 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
+logger = getLogger("scrapper")
+
 CSS_CLASSES = {
     "review": {
         "title": "biGQs _P fiohW qWPrE ncFvv fOtGX",
-        "date": "TreSq",
+        "date": "biGQs _P pZUbB ncFvv osNWb",
         "category": "RpeCd",
         "comment": {
             "div": "biGQs _P pZUbB KxBGd",
@@ -24,7 +27,8 @@ CSS_CLASSES = {
         },
         "local": {
             "div": "JINyA"
-        }
+        },
+        "rating": "UctUV d H0"
     },
     "obstacles": {
         "bottom_ads": "ZHIlj E s f e"
@@ -36,26 +40,25 @@ XPATHS = {
     "bottom_ads_closer": ".//button[contains(@type, 'button') and contains (@aria-label, 'Close')]",
     "bottom_ads": ".//div[contains(@class, '{}')]".format(CSS_CLASSES["obstacles"]["bottom_ads"]),
     "accept_cookies": '//*[@id="onetrust-accept-btn-handler"]',
-    "language_selector": '//*[@id="tab-data-qa-reviews-0"]/div/div[1]/span/div/div[2]/div/div/span[2]/span/div/div/button',
+    "language_selector": '//span[text()="English"]',
     "lang_option": './/span[@id="menu-item-{}"]',
     "next_page_button": '//a[contains(@data-smoke-attr, "pagination-next-arrow")]',
-    "pagination_info": '//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div[11]/div[2]/div/div',
+    "pagination_info": '//div[contains(text(),"Mostrando")]',
     "place_name": './/h1[@data-automation="mainH1"]',
-    "review_amount": '//*[@id="tab-data-qa-reviews-0"]/div/div[3]/span/div/div[1]/div[2]/span',
     "review_cards": '//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div',
-    "review_title": './/span/div/div[contains(@class, "'+CSS_CLASSES["review"]["title"]+'")]/a/span',
-    "review_comment": './/div[contains(@class, "'+CSS_CLASSES["review"]["comment"]["div"]+'")]/span[contains(@class, "'+CSS_CLASSES["review"]["comment"]["span"]+'")]',
-    "review_date": './/span/div/div[contains(@class, "'+CSS_CLASSES["review"]["date"]+'")]/div[1]',
-    "review_rating": './/span/div/div[2]/*[name()="svg"]',
-    "local": './/div[contains(@class, "'+CSS_CLASSES["review"]["local"]["div"]+'")]',
-    "category": './/div[contains(@class, "'+CSS_CLASSES["review"]["category"]+'")]',
+    "review_title": './/div[@class="'+ CSS_CLASSES["review"]["title"] +'"]',
+    "review_comment": './/div[contains(@class, "'+ CSS_CLASSES["review"]["comment"]["div"] +'")]/span[contains(@class, "'+ CSS_CLASSES["review"]["comment"]["span"] +'")]',
+    "review_date": './/div[contains(@class, "'+ CSS_CLASSES["review"]["date"] +'")]',
+    "review_rating": './/*[local-name()="svg" and @class="' + CSS_CLASSES["review"]["rating"] + '"]',
+    "local": './/div[contains(@class, "'+ CSS_CLASSES["review"]["local"]["div"] +'")]',
+    "category": './/div[contains(@class, "'+ CSS_CLASSES["review"]["category"] +'")]',
 }
 
 REGEXES = {
     "starts_with_number": '^\d.+$',
     "rating": "^(\d.\d) of \d bubbles$",
     "get_local": "^([a-zA-Z, ]+)\d.+$",
-    "get_review_amount": "^(((\d)+,?)*) reviews$"
+    "get_review_amount": "^Mostrando.* de (.*) resultados$"
 }
 
 
@@ -68,7 +71,7 @@ class Crawler:
             ChromeDriverManager().install()), chrome_options=chrome_options)
 
     def open_page(self, url: str, cookies: bool = True):
-        custom_print("Puxando url {}".format(url))
+        debug("Puxando url {}".format(url))
         self.driver.get(url)
         if cookies:
             self.__handle_cookies()
@@ -92,16 +95,6 @@ class Crawler:
     def close(self):
         self.driver.close()
 
-    def select_language(self, lang: str):
-        self.__open_language_selector()
-        try:
-            lang_option = self.driver.find_element(
-                By.XPATH, XPATHS["lang_option"].format(lang))
-            lang_option.click()
-        except NoSuchElementException as e:
-            custom_print("Não foi possível encontrar a língua {}".format(lang))
-            raise e
-
     def get_page_title(self):
         return self.driver.find_element(By.XPATH, XPATHS["place_name"]).text
 
@@ -110,10 +103,10 @@ class Crawler:
             if self.driver.find_element(By.XPATH, XPATHS["next_page_button"]) is not None:
                 return True
         except NoSuchElementException:
-            custom_print("Acabaram-se as páginas!")
+            debug("Acabaram-se as páginas!")
             return False
         except Exception as e:
-            custom_print(
+            debug(
                 "Erro ao verificar se há próxima página: {}".format(e))
             return False
 
@@ -124,43 +117,23 @@ class Crawler:
                     (By.XPATH, XPATHS["accept_cookies"]))
             ).click()
         except TimeoutException:
-            custom_print("Supondo que não haverão mais cookies, prosseguindo.")
+            debug("Supondo que não haverão mais cookies, prosseguindo.")
 
-    def __open_language_selector(self):
-        WebDriverWait(self.driver, 10).until(
-            expected_conditions.element_to_be_clickable(
-                (By.XPATH, XPATHS["language_selector"])
-            )
-        )
-
-        language_selector = self.driver.find_element(
-            By.XPATH, XPATHS["language_selector"])
-        cannot_click = True
-        while cannot_click:
-            try:
-                language_selector.click()
-                cannot_click = False
-            except ElementClickInterceptedException as e:
-                custom_print(str(e))
-                custom_print(
-                    "Erro ao clicar no seletor de idioma. Tentando novamente...")
-                cannot_click = True
-
-    def go_to_next_page(self):
+    def go_to_next_page(self, page_title: str):
         try:
-            custom_print("Indo para próxima página")
-            self.driver.find_element(
-                By.XPATH, XPATHS["next_page_button"]).click()
+            el = self.driver.find_element(
+                By.XPATH, XPATHS["next_page_button"])
+            debug("{} -> Indo para próxima página".format(page_title))
+            el.click()
         except NoSuchElementException:
-            raise Exception(
-                "Não foi possível encontrar o botão de próxima página.")
+            raise Exception("Não foi possível encontrar o botão de próxima página.")
 
     def wait_reviews_to_load(self):
         try:
             WebDriverWait(self.driver, 10).until(
                 expected_conditions.presence_of_element_located((By.XPATH, XPATHS["pagination_info"])))
         except TimeoutException:
-            custom_print(
+            debug(
                 "Tempo esgotado ao aguardar o carregamento das reviews")
         except Exception as e:
             raise Exception(
@@ -180,12 +153,24 @@ class Crawler:
         return page_reviews, counter
 
     def parse_date(self, date: str):
-        parsed = datetime.datetime.strptime(
-            date, "Written %B %d, %Y").strftime("%d/%m/%Y")
+        parsed = datetime.datetime.strptime(date, "Feita em %d de %B de %Y").strftime("%d/%m/%Y")
         return parsed
 
     def get_review_date(self, review: WebElement):
         return review.find_element(By.XPATH, XPATHS["review_date"]).text
+
+    def get_review_amount(self):
+        pagination_info = self.driver.find_element(
+            By.XPATH, XPATHS["pagination_info"]).text
+        pattern = re.compile(REGEXES["get_review_amount"])
+        amount = 0
+        try:
+            review_amount_str = re.match(pattern, pagination_info).group(1)
+            amount = int(review_amount_str.replace(".", ""))
+        except Exception as e:
+            debug("Erro ao obter a quantidade de reviews: {}".format(e))
+
+        return amount
 
     def parse_rating(self, rating_str: str):
         pattern = re.compile(REGEXES["rating"])
@@ -193,7 +178,7 @@ class Crawler:
         try:
             rating = float(re.match(pattern, rating_str).group(1))
         except Exception as e:
-            custom_print(
+            debug(
                 "Erro ao parsear o rating ({}): {}".format(rating_str, e))
 
         return rating
@@ -209,7 +194,7 @@ class Crawler:
             try:
                 local = match.group(1)
             except Exception as e:
-                custom_print("Erro ao obter o local: {}".format(e))
+                debug("Erro ao obter o local: {}".format(e))
 
         return local
 
@@ -236,34 +221,3 @@ class Crawler:
             "local": local,
             "category": category
         }
-
-    def get_review_amount(self, language: str):
-        self.__open_language_selector()
-        lang_option = self.driver.find_element(
-            By.XPATH, XPATHS["lang_option"].format(language))
-        lang_string = lang_option.find_element(
-            By.XPATH, XPATHS["review_amount"]).text
-        return "".join(lang_string.split()[1:-2])
-
-    def language_routine(self, lang: str):
-        self.__open_language_selector()
-        try:
-            lang_option = self.driver.find_element(
-                By.XPATH, XPATHS["lang_option"].format(lang))
-            review_amount_str = lang_option.find_element(
-                By.XPATH, XPATHS["review_amount"]).text
-            lang_option.click()
-        except NoSuchElementException as e:
-            raise Exception(
-                "Não foi possível encontrar a língua {}".format(lang))
-
-        review_amount = 0
-        try:
-            print("Review amount: " + review_amount_str)
-            review_amount = re.match(
-                REGEXES["get_review_amount"], review_amount_str).group(1)
-        except Exception as e:
-            raise Exception(
-                "Não foi possível encontrar a quantidade de reviews da língua {}: {}".format(lang, e))
-
-        return review_amount
