@@ -1,5 +1,6 @@
 # coding: utf-8
 import datetime
+import os
 import re
 from logger import debug, error
 from typing import Dict, List, Union, Tuple
@@ -44,20 +45,20 @@ XPATHS = {
     "next_page_button": '//a[contains(@data-smoke-attr, "pagination-next-arrow")]',
     "pagination_info": '//div[contains(text(),"Mostrando")]',
     "place_name": './/h1[@data-automation="mainH1"]',
-    "review_cards": '//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div',
-    "review_title": './/div[@class="'+ CSS_CLASSES["review"]["title"] +'"]',
+    "review_cards": '//*[@data-automation="reviewCard"]',
+    "review_title": './/a[contains(@class, "'+ CSS_CLASSES["review"]["title"] +'")]/span',
     "review_comment": './/div[contains(@class, "'+ CSS_CLASSES["review"]["comment"]["div"] +'")]/span[contains(@class, "'+ CSS_CLASSES["review"]["comment"]["span"] +'")]',
     "review_date": './/div[contains(@class, "'+ CSS_CLASSES["review"]["date"] +'")]',
     "review_rating": './/*[local-name()="svg" and @class="' + CSS_CLASSES["review"]["rating"] + '"]',
     "local": './/div[contains(@class, "'+ CSS_CLASSES["review"]["local"]["div"] +'")]',
     "category": './/div[contains(@class, "'+ CSS_CLASSES["review"]["category"] +'")]',
 }
-
 REGEXES = {
     "starts_with_number": '^\d.+$',
-    "rating": "^(\d.\d) of \d bubbles$",
+    "rating": "^(\d.\d) de \d círculos$",
     "get_local": "^([a-zA-Z, ]+)\d.+$",
-    "get_review_amount": "^Mostrando.* de (.*) resultados$"
+    "get_review_amount": "^Mostrando.* de (.*) resultados$",
+    "get_category": "^.*• (.*)$",
 }
 
 
@@ -195,10 +196,14 @@ class Scrapper:
         pattern = re.compile(REGEXES["rating"])
         rating = "?"
         try:
-            rating = float(re.match(pattern, rating_str).group(1))
+            rating = float(
+                re.
+                match(pattern, rating_str).
+                group(1).
+                replace(",", ".")
+            )
         except Exception as e:
-            debug(
-                "Erro ao parsear o rating ({}): {}".format(rating_str, e))
+            error("Erro ao parsear o rating ({}): {}".format(rating_str, e))
 
         return rating
 
@@ -220,15 +225,23 @@ class Scrapper:
 
     def get_category(self, review: WebElement) -> Union[str, None]:
         debug("Obtendo categoria do review")
+        raw_category = review.find_element(By.XPATH, XPATHS["category"]).text
+        match = re.match(REGEXES["get_category"], raw_category)
         try:
-            return review.find_element(By.XPATH, XPATHS["category"]).text
+            if match:
+                category = match.group(1)
+            else:
+                category = ""
         except NoSuchElementException:
-            return None
+            return ""
+
+        return category
 
     def handle_review(self, review: WebElement) -> Dict:
         debug("Extraindo dados do review")
         debug("Pegando título")
         title = review.find_element(By.XPATH, XPATHS["review_title"]).text
+        self.print_element(review.find_element(By.XPATH, XPATHS["review_title"]))
         debug("Pegando comentário")
         comment = review.find_element(By.XPATH, XPATHS["review_comment"]).text
         debug("Pegando data")
@@ -249,3 +262,8 @@ class Scrapper:
             "local": local,
             "category": category
         }
+
+    def print_element(self, element: WebElement):
+        # now = datetime.datetime.now()
+        # debug(element.screenshot(f"{os.getcwd()}/element{now}.png"))
+        debug(element.screenshot(f"{os.getcwd()}/element.png"))

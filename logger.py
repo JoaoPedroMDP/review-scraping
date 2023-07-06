@@ -72,12 +72,12 @@ def logs():
     return logger, nesting_level, indentation_level, filename, line_number
 
 
-def debug(msg: str):
+def debug(msg: any):
     logger, nesting_level, indentation_level, filename, line_number = logs()
     logger.debug('{}{} {} ({}:{})'.format(
         '.' * nesting_level,
         "»" * (indentation_level // 4),
-        msg,
+        str(msg),
         filename,
         line_number
     ))

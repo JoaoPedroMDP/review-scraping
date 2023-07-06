@@ -80,6 +80,7 @@ def start_csv_writer(file: TextIO) -> csv.DictWriter:
         "category": ""
     }
     dict_to_csv_writer = csv.DictWriter(file, example.keys())
+    dict_to_csv_writer.writeheader()
     return dict_to_csv_writer
 
 
