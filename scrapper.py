@@ -241,7 +241,6 @@ class Scrapper:
         debug("Extraindo dados do review")
         debug("Pegando título")
         title = review.find_element(By.XPATH, XPATHS["review_title"]).text
-        self.print_element(review.find_element(By.XPATH, XPATHS["review_title"]))
         debug("Pegando comentário")
         comment = review.find_element(By.XPATH, XPATHS["review_comment"]).text
         debug("Pegando data")
