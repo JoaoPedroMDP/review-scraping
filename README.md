@@ -8,6 +8,15 @@
 5. Execute o script com `python main.py`
 
 ## Comportamento do script
+
+Os dados extraídos atualmente são:
+- Título
+- Comentário
+- Data
+- Nota
+- Local
+- Categoria
+
 O comportamento do script é afetado pelas configurações em 'config.py'.
 No geral, para cada url em 'urls.txt', o script irá abrir um navegador, pegar todos 
 os comentários da página, pular pra próxima página, e repetir até que não existam mais páginas.
