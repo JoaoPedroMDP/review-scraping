@@ -9,4 +9,4 @@ HEADLESS = False
 
 # Limite de reviews a serem salvos em memória principal antes
 # de salvar no disco
-SAVING_THRESHOLD = 100
+SAVING_THRESHOLD = 150

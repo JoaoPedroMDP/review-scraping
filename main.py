@@ -26,7 +26,7 @@ except:
 def write_data_chunk(csv_writer: csv.DictWriter, data: List[Dict]):
     try:
         info("Salvando {} reviews em {}".format(
-            debug(str(len(data))), datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+            str(len(data)), datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
         csv_writer.writerows(data)
         info("Salvamento terminado em {}".format(
             datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
@@ -46,16 +46,18 @@ def scrap_url(scrapper: Scrapper, csv_writer: csv.DictWriter, page_title: str):
     try:
         while has_next_page:
             scrapper.wait_reviews_to_load()
-            reviews, processed = scrapper.scrap_page()
+            tmp_reviews, processed = scrapper.scrap_page()
+            reviews += tmp_reviews  
             counter += processed
 
             info("{} -> {:.2f}% ({}/{})".format(page_title,
                          (counter/review_amount)*100, counter, review_amount))
             has_next_page = scrapper.has_next_page()
-
-            if counter >= SAVING_THRESHOLD == 0:
+            info(f"Segurando {counter} reviews (vai salvar: {counter >= SAVING_THRESHOLD})")
+            if counter >= SAVING_THRESHOLD:
                 write_data_chunk(csv_writer, reviews)
                 reviews = []
+                counter = 0
 
             if has_next_page:
                 scrapper.go_to_next_page(page_title)

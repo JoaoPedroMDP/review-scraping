@@ -2,7 +2,7 @@
 import datetime
 import os
 import re
-from logger import debug, error
+from logger import debug, error, info
 from typing import Dict, List, Union, Tuple
 
 from selenium import webdriver
@@ -23,7 +23,7 @@ CSS_CLASSES = {
         "category": "RpeCd",
         "comment": {
             "div": "biGQs _P pZUbB KxBGd",
-            "span": "yCeTE"
+            "span": "JguWG"
         },
         "local": {
             "div": "JINyA"
@@ -133,7 +133,7 @@ class Scrapper:
         try:
             el = self.driver.find_element(
                 By.XPATH, XPATHS["next_page_button"])
-            debug("{} -> Indo para próxima página".format(page_title))
+            info("{} -> Indo para próxima página".format(page_title))
             el.click()
         except NoSuchElementException:
             raise Exception("Não foi possível encontrar o botão de próxima página.")
@@ -159,12 +159,12 @@ class Scrapper:
         counter = 0
         for review in raw_reviews:
             new_data = self.handle_review(review)
-            debug("Review extraído: {}".format(new_data))
+            info("Review extraído: {}".format(new_data))
             if new_data is not None:
                 page_reviews.append(new_data)
                 counter += 1
         
-        debug(f"Encontrados {counter} reviews")
+        info(f"Encontrados {counter} reviews")
         return page_reviews, counter
 
     def parse_date(self, date: str):

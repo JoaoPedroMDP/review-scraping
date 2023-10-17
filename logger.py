@@ -40,7 +40,7 @@ def init_logging():
         },
         'loggers': {
             'scrapper': {
-                'level': "DEBUG",
+                'level': "INFO",
                 'handlers': ['file', 'terminal'],
                 'propagate': False
             },
